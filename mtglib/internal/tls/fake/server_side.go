@@ -111,7 +111,15 @@ func generateServerHelloHandshakePayload(buf *bytes.Buffer, hello *ClientHello) 
 	buf.WriteByte(byte(len(hello.SessionID)))
 	buf.Write(hello.SessionID)
 
-	binary.Write(buf, binary.BigEndian, hello.CipherSuite) //nolint: errcheck
+	// Use a real TLS 1.3 cipher suite in ServerHello to avoid DPI detection.
+	// GREASE values (pattern 0x?a?a) are reserved placeholders that real
+	// TLS servers never select — echoing them back is a trivial fingerprint.
+	cipherSuite := hello.CipherSuite
+	if cipherSuite&0x0f0f == 0x0a0a {
+		cipherSuite = 0x1301 // TLS_AES_128_GCM_SHA256
+	}
+
+	binary.Write(buf, binary.BigEndian, cipherSuite) //nolint: errcheck
 
 	buf.Write(serverHelloSuffix)
 
